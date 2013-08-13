@@ -31,7 +31,7 @@ class Value(object):
 
     def __nonzero__(self):
         # Py 2's name for __bool__
-        return self.__bool__()
+        return True
 
     ### NOTE: From here on down, the operators are exposed to Sass code and
     ### thus should ONLY return Sass types
