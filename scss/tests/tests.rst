@@ -5,7 +5,7 @@ INITIALIZATION
 --------------
 
 >>> from scss import Scss
->>> css = Scss()
+>>> css = Scss(scss_opts=dict(debug_info='comments'))
 
 VARIABLES
 ---------
@@ -327,6 +327,21 @@ http://xcss.antpaw.org/docs/syntax/math
         margin: 10 20%;
     }
 
+    >>> print css.compile('''
+    ... @option compress:no, short_colors:yes, reverse_colors:yes;
+    ... .selector {
+    ...     padding: [4em / 2em];
+    ...     margin: [4em / 2em]em;
+    ...     width: [8px / 2px];
+    ...     height: [500px / 2];
+    ... }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    .selector {
+        padding: 2;
+        margin: 2em;
+        width: 4;
+        height: 250px;
+    }
 
 SASS NESTING COMPATIBILITY
 --------------------------
@@ -531,26 +546,6 @@ http://sass-lang.com/tutorial.html
     }
 
 
-    Support for ``@content``
-    >>> print css.compile('''
-    ... @option compress:no, short_colors:yes, reverse_colors:yes;
-    ... @mixin iphone {
-    ...   @media only screen and (max-width: 480px) {
-    ...     @content;
-    ...   }
-    ... }
-    ...
-    ... @include iphone {
-    ...   body { color: red }
-    ... }
-    ... ''') #doctest: +NORMALIZE_WHITESPACE
-    @media only screen and (max-width: 480px) {
-        body {
-            color: red;
-        }
-    }
-
-
 SASS EXTEND COMPATIBILITY
 -------------------------
 
@@ -650,23 +645,6 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#extend
         border-width: 3px;
     }
 
-
-    Placeholder Selectors: ``%foo``
-    >>> print css.compile('''
-    ... @option compress:no, short_colors:yes, reverse_colors:yes;
-    ... // This ruleset won't be rendered on its own.
-    ... #context a%extreme {
-    ...   color: blue;
-    ...   font-weight: bold;
-    ...   font-size: 2em;
-    ... }
-    ... .notice { @extend %extreme; }
-    ... ''') #doctest: +NORMALIZE_WHITESPACE
-    #context a.notice {
-        color: #00f;
-        font-weight: bold;
-        font-size: 2em;
-    }
 
 
 FROM THE FORUM
@@ -985,11 +963,15 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
     ... }
     ... '''
     >>> print css.compile() #doctest: +NORMALIZE_WHITESPACE
+    /* 1 selector generated from 'second.css' add up to a total of 1 selector accumulated */
+    /* file: second.css, line: 3 */
     .basicClass,
     .specialClass {
         padding: 20px;
         background-color: red;
     }
+    /* 1 selector generated from 'first.css' add up to a total of 2 selectors accumulated */
+    /* file: first.css, line: 3 */
     .specialClass {
         padding: 10px;
         font-size: 14px;
@@ -1235,204 +1217,78 @@ TESTS FOR REPORTED ISSUES
     }
 
 
-### Issue #52 test
+### Issue #110 test
 
     >>> print css.compile('''
-    ... @option compress:no;
-    ... h1 {
-    ...   background: url(//example.com/image.png);
+    ... @option compress:no, reverse_colors:yes;
+    ... $global: blue;
+    ... @mixin box {
+    ...   $global: red;
+    ...   color: $global;
+    ... }
+    ... p {
+    ...   @include box();
     ... }
     ... ''') #doctest: +NORMALIZE_WHITESPACE
-    h1 {
-      background: url(//example.com/image.png);
+    p {
+      color: red;
     }
 
 
-### Strings interpolation
+ADVANCED STUFF, NOT (YET) SUPPORTED (FROM SASS)
+-----------------------------------------------
 
-    >>> print css.compile('''
-    ... @option compress:no, short_colors: no;
-    ... a {
-    ...   $a: 'a';
-    ...   $b: 'b';
-    ...   $c: 'c';
-    ...   $x: '';
-    ...   A: $a$b$x$c;
-    ...   B: '$a$b$x$c';
-    ...   C: "$a$b$x$c";
-    ...   D: #{$a}#{$b}#{$x}#{$c};
-    ...   E: '#{$a}#{$b}#{$x}#{$c}';
-    ...   F: "#{$a}#{$b}#{$x}#{$c}";
+    >> print css.compile('''
+    ... @option compress:no, short_colors:yes, reverse_colors:yes;
+    ... .mod {
+    ...     margin: 10px;
+    ... }
+    ... .mod h1 {
+    ...     font-size: 40px;
+    ... }
+    ... .cleanBox h1 extends .mod {
+    ...     font-size: 60px;
     ... }
     ... ''') #doctest: +NORMALIZE_WHITESPACE
-    a {
-      A: a b  c;
-      B: $a$b$x$c;
-      C: "$a$b$x$c";
-      D: abc;
-      E: abc;
-      F: "abc";
+    .cleanBox h1, .mod {
+        margin: 10px;
+    }
+    .cleanBox h1, .mod h1 {
+        font-size: 40px;
+    }
+    .cleanBox h1 {
+        font-size: 60px;
+    }
+
+http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
+
+Any rule that uses a:hover will also work for .hoverlink, even if they have other selectors as well
+
+    >> print css.compile('''
+    ... @option compress:no, short_colors:yes, reverse_colors:yes;
+    ... .comment a.user:hover { font-weight: bold }
+    ... .hoverlink { @extend a:hover }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    .comment a.user:hover,
+    .comment .hoverlink.user {
+        font-weight: bold;
     }
 
 
-### Strings interpolation
+Sometimes a selector sequence extends another selector that appears in another
+sequence. In this case, the two sequences need to be merged.
+While it would technically be possible to generate all selectors that could
+possibly match either sequence, this would make the stylesheet far too large.
+The simple example above, for instance, would require ten selectors. Instead,
+Sass generates only selectors that are likely to be useful.
 
-    >>> print css.compile('''
-    ... @option compress:no, short_colors: no;
-    ... a {
-    ...   @each $a in '', '_a' {
-    ...     @each $b in '', '_b' {
-    ...       @each $c in '', '_c' {
-    ...         A: X#{$a}#{$b}#{$c};
-    ...       }
-    ...     }
-    ...   }
-    ... }
+    >> print css.compile('''
+    ... @option compress:no, short_colors:yes, reverse_colors:yes;
+    ... #admin .tabbar a { font-weight: bold }
+    ... #demo .overview .fakelink { @extend a }
     ... ''') #doctest: +NORMALIZE_WHITESPACE
-    a {
-      A: X;
-      A: X_c;
-      A: X_b;
-      A: X_b_c;
-      A: X_a;
-      A: X_a_c;
-      A: X_a_b;
-      A: X_a_b_c;
+    #admin .tabbar a,
+    #admin .tabbar #demo .overview .fakelink,
+    #demo .overview #admin .tabbar .fakelink {
+        font-weight: bold;
     }
-
-
-### Compass excerpt
-
-    >>> print css.compile('''
-    ... @option compress:no, short_colors: no;
-    ...
-    ... $experimental-support-for-mozilla      : true !default;
-    ... $experimental-support-for-webkit       : true !default;
-    ... $experimental-support-for-opera        : true !default;
-    ... $experimental-support-for-microsoft    : true !default;
-    ... $experimental-support-for-khtml        : false !default;
-    ...
-    ... @mixin experimental($property, $value,
-    ...   $moz      : $experimental-support-for-mozilla,
-    ...   $webkit   : $experimental-support-for-webkit,
-    ...   $o        : $experimental-support-for-opera,
-    ...   $ms       : $experimental-support-for-microsoft,
-    ...   $khtml    : $experimental-support-for-khtml,
-    ...   $official : true
-    ... ) {
-    ...   @if $webkit  and $experimental-support-for-webkit    { -webkit-#{$property} : $value; }
-    ...   @if $khtml   and $experimental-support-for-khtml     {  -khtml-#{$property} : $value; }
-    ...   @if $moz     and $experimental-support-for-mozilla   {    -moz-#{$property} : $value; }
-    ...   @if $ms      and $experimental-support-for-microsoft {     -ms-#{$property} : $value; }
-    ...   @if $o       and $experimental-support-for-opera     {      -o-#{$property} : $value; }
-    ...   @if $official                                        {         #{$property} : $value; }
-    ... }
-    ...
-    ... $default-box-shadow-color: #333333 !default;
-    ... $default-box-shadow-h-offset: 0px !default;
-    ... $default-box-shadow-v-offset: 0px !default;
-    ... $default-box-shadow-blur: 5px !default;
-    ... $default-box-shadow-spread : false !default;
-    ... $default-box-shadow-inset : false !default;
-    ...
-    ... @mixin box-shadow(
-    ...   $shadow-1 : default,
-    ...   $shadow-2 : false,
-    ...   $shadow-3 : false,
-    ...   $shadow-4 : false,
-    ...   $shadow-5 : false,
-    ...   $shadow-6 : false,
-    ...   $shadow-7 : false,
-    ...   $shadow-8 : false,
-    ...   $shadow-9 : false,
-    ...   $shadow-10: false
-    ... ) {
-    ...   @if $shadow-1 == default {
-    ...     $shadow-1 : -compass-space-list(compact(if($default-box-shadow-inset, inset, false), $default-box-shadow-h-offset, $default-box-shadow-v-offset, $default-box-shadow-blur, $default-box-shadow-spread, $default-box-shadow-color));
-    ...   }
-    ...   $shadow : compact($shadow-1, $shadow-2, $shadow-3, $shadow-4, $shadow-5, $shadow-6, $shadow-7, $shadow-8, $shadow-9, $shadow-10);
-    ...   @include experimental(box-shadow, $shadow,
-    ...     -moz, -webkit, not -o, not -ms, not -khtml, official
-    ...   );
-    ... }
-    ...
-    ... a {
-    ...   $drop-shadow-color: red;
-    ...   $drop-shadow-blur: 4px;
-    ...   $inner-shadow-color: rgba(0, 0, 0, 0.5);
-    ...   $inner-shadow-blur: 40px !default;
-    ...   $offset-x: 0;
-    ...   $offset-y: -1px;
-    ...   +box-shadow: $drop-shadow-color $offset-x $offset-y $drop-shadow-blur 0, $inner-shadow-color 0 0 $inner-shadow-blur inset;
-    ... }
-    ... ''') #doctest: +NORMALIZE_WHITESPACE
-    a {
-      -webkit-box-shadow: #ff0000 0 -1px 4px 0, rgba(0, 0, 0, 0.5) 0 0 40px inset;
-      -moz-box-shadow: #ff0000 0 -1px 4px 0, rgba(0, 0, 0, 0.5) 0 0 40px inset;
-      box-shadow: #ff0000 0 -1px 4px 0, rgba(0, 0, 0, 0.5) 0 0 40px inset;
-    }
-
-
-UNSUPPORTED
------------
-
->>> UNSUPPORTED = """
-... ADVANCED STUFF, NOT SUPPORTED (FROM SASS):
-... --------------------------------------------------------------------------------
-... >>> print css.compile('''
-... ... @option compress:no, short_colors:yes, reverse_colors:yes;
-... ... .mod {
-... ...     margin: 10px;
-... ... }
-... ... .mod h1 {
-... ...     font-size: 40px;
-... ... }
-... ... .cleanBox h1 extends .mod {
-... ...     font-size: 60px;
-... ... }
-... ... ''') #doctest: +NORMALIZE_WHITESPACE
-... .cleanBox h1,
-... .mod {
-...     margin: 10px;
-... }
-... .cleanBox h1,
-... .mod h1 {
-...     font-size: 40px;
-... }
-... .cleanBox h1 {
-...     font-size: 60px;
-... }
-... 
-... http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
-... 
-... Any rule that uses a:hover will also work for .hoverlink, even if they have other selectors as well
-... >>> print css.compile('''
-... ... @option compress:no, short_colors:yes, reverse_colors:yes;
-... ... .comment a.user:hover { font-weight: bold }
-... ... .hoverlink { @extend a:hover }
-... ... ''') #doctest: +NORMALIZE_WHITESPACE
-... .comment a.user:hover,
-... .comment .hoverlink.user {
-...     font-weight: bold;
-... }
-... 
-... 
-... Sometimes a selector sequence extends another selector that appears in another
-... sequence. In this case, the two sequences need to be merged.
-... While it would technically be possible to generate all selectors that could
-... possibly match either sequence, this would make the stylesheet far too large.
-... The simple example above, for instance, would require ten selectors. Instead,
-... Sass generates only selectors that are likely to be useful.
-... >>> print css.compile('''
-... ... @option compress:no, short_colors:yes, reverse_colors:yes;
-... ... #admin .tabbar a { font-weight: bold }
-... ... #demo .overview .fakelink { @extend a }
-... ... ''') #doctest: +NORMALIZE_WHITESPACE
-... #admin .tabbar a,
-... #admin .tabbar #demo .overview .fakelink,
-... #demo .overview #admin .tabbar .fakelink {
-...     font-weight: bold;
-... }
-... 
-... --------------------------------------------------------------------------------
-... """

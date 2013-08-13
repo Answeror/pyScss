@@ -4,7 +4,7 @@
 pyScss, a Scss compiler for Python
 
 @author     German M. Bravo (Kronuz) <german.mb@gmail.com>
-@version    1.1.5
+@version    1.2.0 alpha
 @see        https://github.com/Kronuz/pyScss
 @copyright  (c) 2012-2013 German M. Bravo (Kronuz)
 @license    MIT License
@@ -44,7 +44,7 @@ xCSS:
 
 """
 
-VERSION_INFO = (1, 1, 5)
+VERSION_INFO = (1, 2, 0)
 DATE_INFO = (2013, 2, 15)  # YEAR, MONTH, DAY
 VERSION = '.'.join(str(i) for i in VERSION_INFO)
 REVISION = '%04d%02d%02d' % DATE_INFO
